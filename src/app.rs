@@ -23,7 +23,10 @@ impl App {
             if self.in_console {
                 self.run_interactive_cli();
             } else {
-                self.show_gui_instructions();
+                Platform::show_gui_error(
+                    "b64d - Usage Instructions",
+                    "Please drag and drop Base64-encoded file(s) onto this executable to decode them.",
+                );
             }
         } else {
             self.process_arguments(&args[1..]);
@@ -41,15 +44,15 @@ impl App {
 
         let mut input_path = String::new();
         if io::stdin().read_line(&mut input_path).is_ok() {
-            let trimmed_path = input_path.trim().trim_matches('"').trim_matches('\'');
-            if trimmed_path.is_empty() {
+            let trimmed = input_path.trim().trim_matches('"').trim_matches('\'');
+            if trimmed.is_empty() {
                 println!("No file specified. Exiting.");
                 return;
             }
 
-            let path = Path::new(trimmed_path);
+            let path = Path::new(trimmed);
             if !path.exists() {
-                self.report_error("File Not Found", &format!("File '{}' does not exist.", trimmed_path));
+                self.report_error("File Not Found", &format!("File '{}' does not exist.", trimmed));
                 self.wait_for_enter();
                 return;
             }
@@ -59,24 +62,14 @@ impl App {
         self.wait_for_enter();
     }
 
-    fn show_gui_instructions(&self) {
-        Platform::show_gui_error(
-            "b64d - Usage Instructions",
-            "Please drag and drop Base64-encoded file(s) onto this executable to decode them.",
-        );
-    }
-
-    fn process_arguments(&self, file_paths: &[String]) {
-        let mut has_errors = false;
-        for arg in file_paths {
+    fn process_arguments(&self, paths: &[String]) {
+        for arg in paths {
             let path = Path::new(arg);
             if path.exists() {
                 if let Err(e) = self.decode_file(path) {
-                    has_errors = true;
                     self.report_error("Decoding Error", &format!("Failed to decode file {:?}:\n{}", path, e));
                 }
             } else {
-                has_errors = true;
                 self.report_error("File Not Found", &format!("File '{:?}' does not exist.", path));
             }
         }
@@ -84,16 +77,14 @@ impl App {
         if self.in_console {
             println!("\nDone!");
             self.wait_for_enter();
-        } else if has_errors {
-            // Error popped up already per file
         }
     }
 
     fn process_file(&self, path: &Path) {
         match self.decode_file(path) {
-            Ok(saved_path) => {
+            Ok(saved) => {
                 if self.in_console {
-                    println!("Success! Decoded into: {:?}", saved_path);
+                    println!("Success! Decoded into: {:?}", saved);
                 }
             }
             Err(e) => {
@@ -153,17 +144,14 @@ mod tests {
 
         let app = App { in_console: true };
 
-        // First decode
         let res1 = app.decode_file(&input_file).unwrap();
         assert_eq!(res1, temp_dir.join("payload-decoded.txt"));
         assert_eq!(fs::read_to_string(&res1).unwrap(), "Hello world");
 
-        // Second decode (should increment)
         let res2 = app.decode_file(&input_file).unwrap();
         assert_eq!(res2, temp_dir.join("payload-decoded(1).txt"));
         assert_eq!(fs::read_to_string(&res2).unwrap(), "Hello world");
 
-        // Clean up
         let _ = fs::remove_dir_all(temp_dir);
     }
 }

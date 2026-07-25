@@ -6,47 +6,29 @@ impl Base64Extractor {
     /// Extracts Base64 content from raw input bytes.
     /// Handles PEM blocks, Data URL schemes, and filters out non-Base64 characters.
     pub fn extract(raw_bytes: &[u8]) -> String {
-        let content_str = String::from_utf8_lossy(raw_bytes);
-        let mut captured_lines = Vec::new();
-        let mut in_block = false;
-        let mut has_block = false;
+        let mut target = raw_bytes;
 
-        for line in content_str.lines() {
-            let trimmed = line.trim();
-            if trimmed.starts_with("-----BEGIN") {
-                in_block = true;
-                has_block = true;
-                continue;
-            }
-            if trimmed.starts_with("-----END") {
-                in_block = false;
-                continue;
-            }
-            if has_block {
-                if in_block {
-                    captured_lines.push(trimmed);
+        // Extract raw bytes inside PEM block if present
+        if let Some(begin) = raw_bytes.windows(10).position(|w| w == b"-----BEGIN") {
+            if let Some(nl) = raw_bytes[begin..].iter().position(|&b| b == b'\n') {
+                let actual_start = begin + nl + 1;
+                if let Some(end) = raw_bytes[actual_start..].windows(8).position(|w| w == b"-----END") {
+                    target = &raw_bytes[actual_start..actual_start + end];
                 }
-            } else {
-                captured_lines.push(trimmed);
             }
         }
 
-        let joined = captured_lines.join("");
-
-        // Handle data URL prefix if any (e.g. "data:text/plain;base64,SGVsbG8=")
-        let mut start_idx = 0;
-        let joined_bytes = joined.as_bytes();
-        if joined_bytes.starts_with(b"data:") {
-            if let Some(pos) = joined_bytes.windows(8).position(|w| w == b";base64,") {
-                start_idx = pos + 8;
-            } else if let Some(pos) = joined_bytes.iter().position(|&b| b == b',') {
-                start_idx = pos + 1;
+        // Handle Data URL prefix
+        if target.starts_with(b"data:") {
+            if let Some(pos) = target.windows(8).position(|w| w == b";base64,") {
+                target = &target[pos + 8..];
+            } else if let Some(pos) = target.iter().position(|&b| b == b',') {
+                target = &target[pos + 1..];
             }
         }
 
-        // Filter and collect only valid base64 alphabet characters
-        joined_bytes[start_idx..]
-            .iter()
+        // Filter valid Base64 alphabet characters
+        target.iter()
             .map(|&b| b as char)
             .filter(|&c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '-' || c == '_' || c == '=')
             .collect()

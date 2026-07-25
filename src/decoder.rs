@@ -2,27 +2,19 @@
 pub struct Base64Decoder;
 
 impl Base64Decoder {
-    /// Decodes a pre-cleansed Base64 string into its original bytes.
+    /// Decodes a Base64 string into its original bytes.
     /// Supports both standard and URL-safe Base64 alphabets.
     pub fn decode(input: &str) -> Result<Vec<u8>, String> {
-        let bytes = input.as_bytes();
-        let mut decoded = Vec::with_capacity((bytes.len() * 3) / 4 + 4);
-
+        let mut decoded = Vec::with_capacity((input.len() * 3) / 4 + 4);
         let mut buffer = 0u32;
-        let mut bits_collected = 0;
-        let mut padding_count = 0;
+        let mut bits = 0;
 
-        for &b in bytes {
-            let c = b as char;
-            if c.is_ascii_whitespace() {
+        for &b in input.as_bytes() {
+            if b.is_ascii_whitespace() {
                 continue;
             }
             if b == b'=' {
-                padding_count += 1;
-                continue;
-            }
-            if padding_count > 0 {
-                return Err("Invalid base64: characters found after padding '='".to_string());
+                break;
             }
 
             let val = match b {
@@ -31,17 +23,16 @@ impl Base64Decoder {
                 b'0'..=b'9' => (b - b'0') as u32 + 52,
                 b'+' | b'-' => 62,
                 b'/' | b'_' => 63,
-                _ => return Err(format!("Invalid character '{}' in base64", c)),
+                _ => return Err(format!("Invalid character '{}' in base64", b as char)),
             };
 
             buffer = (buffer << 6) | val;
-            bits_collected += 6;
+            bits += 6;
 
-            if bits_collected >= 8 {
-                bits_collected -= 8;
-                let byte = ((buffer >> bits_collected) & 0xFF) as u8;
-                decoded.push(byte);
-                buffer &= (1 << bits_collected) - 1;
+            if bits >= 8 {
+                bits -= 8;
+                decoded.push((buffer >> bits) as u8);
+                buffer &= (1 << bits) - 1;
             }
         }
 
