@@ -61,11 +61,11 @@ When you pass a file to `b64d` (by dragging it onto the executable or passing it
 
 ---
 
-## Command Line (CLI) Support
+## Command Line (CLI)
 
-`b64d` has full CLI support and works beautifully inside terminal scripts or manual workflows.
+The only arguments are file paths. The executable is designed for drag-and-drop than becoming one of the million CLI decoders out there.
 
-### 1. Decode one or more files directly
+### Decode one or more files directly
 Pass one or multiple file paths as arguments:
 ```bash
 # Single file
