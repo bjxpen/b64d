@@ -1,102 +1,79 @@
-# b64d — Robust, High-Performance Drag-and-Drop Base64 Decoder
 
-`b64d` is a zero-dependency, lightning-fast cross-platform Base64 decoder written in Rust. It is specially designed with a smart dual execution model that detects whether it is running in a traditional console or as a graphical shell process. 
+# b64d (Base64 Decoder)
 
-When files are dragged and dropped onto the executable icon (or double-clicked) in Windows, macOS, or Linux, any decryption or file parsing errors trigger a **beautiful native OS graphical dialog box** rather than instantly flashing the console window and disappearing.
+A tiny, fast, zero-dependency command-line and drag-and-drop Base64 decoder written in Rust.
 
----
-
-## Key Features
-
-- 🖱️ **Seamless Drag & Drop**: Drag one or multiple Base64-encoded files directly onto the executable icon. It immediately decodes and outputs files alongside the originals.
-- 📁 **Smart Duplicate Suffixing**: Outputs files into `<basename>-decoded.<ext>`. If a file already exists, it dynamically resolved duplicates by appending incrementing indexes like `<basename>-decoded(1).<ext>`.
-- 🚀 **Extreme Byte-Level Performance**: Custom hand-crafted Base64 decoder with pre-allocated vectors and zero-allocation cleansing filters for peak throughput and minimum memory footprints.
-- 🛡️ **Extremely Robust Formats**:
-  - Automatically handles wrapped lines with whitespace, newlines, and tabs.
-  - Automatically strips standard HTML / web **Data URL scheme headers** (e.g. `data:image/png;base64,...` or `data:text/plain;base64,...`).
-  - Supports extracting only raw content stored inside standard **PEM block wrappers** (e.g. `-----BEGIN CERTIFICATE-----` ... `-----END CERTIFICATE-----`).
-  - Gracefully decodes both standard MIME and **URL-Safe** base64 (`-` and `_` instead of `+` and `/`), with or without padding.
-- 🖥️ **Smart CLI & GUI Dual-Execution**:
-  - **Console Mode**: Interactive shell prompt letting you input file paths manually.
-  - **GUI/Desktop Mode**: Auto-detects TTY state. Pops up a native dialogue on Windows (Win32 `MessageBoxW`), macOS (`osascript` AppleScript), and Linux (`zenity` / `kdialog` / `xmessage` cascade) if instructions or error notifications need to be displayed.
+Drop a base64-encoded file onto the executable, and it immediately decodes it right next to the original file. No flashing command windows, no complex setups. If there's an error and you're not running it from a terminal, it pops up a clean native system dialog to let you know what went wrong.
 
 ---
 
-## Architecture Design (SOLID & DRY)
+## Why use b64d?
 
-The codebase has been refactored into modular, strictly decoupled components following the best clean coding standards:
-
-- **`src/decoder.rs`**: Hand-crafted base64-to-byte decoding algorithm with zero heap-reallocations during filtering.
-- **`src/extractor.rs`**: Safe, zero-allocation byte windows for isolating data payload inside Data URLs or PEM container blocks.
-- **`src/path_resolver.rs`**: Path resolution layer encapsulating filename manipulations and file existence validations.
-- **`src/platform/`**: Abstracts operating system FFI routines (native console checks and native warning/info box systems) behind a unified, compile-time selected interface.
-- **`src/app.rs`**: High-level orchestrator supervising input and output operations, error logging, and console interaction.
+- **Zero Setup / Single Binary**: Just download the binary and use it. No runtimes, no dependencies.
+- **Smart GUI & CLI Detection**:
+  - Run it from a terminal (CLI)? It works like a standard command line tool.
+  - Double-click or drag-and-drop a file? It runs quietly and only pops up a native dialogue if something goes wrong so you can actually read the error.
+- **Tolerates messy inputs**: Easily handles wrapped lines, PEM headers (`-----BEGIN CERTIFICATE-----`), and browser Data URLs (`data:image/png;base64,...`).
+- **Supports standard and URL-safe Base64**: Decodes both safely.
 
 ---
 
-## Installation & Compilation
+## Automatic Output Naming
 
-Ensure you have [Rust and Cargo](https://rustup.rs/) installed.
+When you pass a file to `b64d` (by dragging it onto the executable or passing it in the terminal), the program automatically determines the output file path based on your input:
 
-### 1. Build and Run Tests
-Run the fully-featured unit and integration test suite to verify implementation correctness:
+1. **Location**: The decoded file is always saved in the **same directory** as the original file.
+2. **Naming**:
+   - Original: `photo.png` -> Decoded: `photo-decoded.png`
+   - Original: `data.txt` -> Decoded: `data-decoded.txt`
+   - Original: `archive` (no extension) -> Decoded: `archive-decoded`
+3. **Automatic Duplicate Prevention**:
+   If the decoded file already exists, it will not overwrite it. Instead, it automatically appends an incrementing index:
+   - 1st run: `photo-decoded.png`
+   - 2nd run: `photo-decoded(1).png`
+   - 3rd run: `photo-decoded(2).png`
+   ... and so on.
+
+---
+
+## Command Line (CLI) Support
+
+`b64d` has full CLI support and works beautifully inside terminal scripts or manual workflows.
+
+### 1. Decode one or more files directly
+Pass one or multiple file paths as arguments:
 ```bash
-cargo test
+# Single file
+b64d encoded.txt
+
+# Multiple files at once
+b64d file1.b64 image.png.txt data.pem
 ```
 
-### 2. Build for Local Release
-Build the highly optimized release binary:
-```bash
-cargo build --release
-```
-The compiled release executable will be available at:
-- **Linux / macOS**: `target/release/b64d`
-- **Windows**: `target/release/b64d.exe`
-
-### 3. Cross-Compiling for Windows from Linux
-To produce a static, single-executable `.exe` for Windows systems while developing on Linux:
-```bash
-# Add the Windows GNU target
-rustup target add x86_64-pc-windows-gnu
-
-# Compile the release binary for Windows
-cargo build --release --target x86_64-pc-windows-gnu
-```
-
----
-
-## Usage Instructions
-
-### Method A: Drag & Drop (GUI Mode)
-1. Select one or more `.txt`, `.b64`, or PEM files containing base64 data.
-2. Drag and drop them directly onto the `b64d` executable icon.
-3. The files will decode silently and save into the same folder as the input. If any error occurs, a GUI message box pop-up will notify you of the exact root cause.
-
-### Method B: Interactive Terminal (Console Mode)
-Simply double-click the executable to launch an interactive terminal menu:
+### 2. Interactive CLI Prompt
+If you run `b64d` inside a terminal without passing any arguments, it starts an interactive CLI menu:
 ```text
 ================ b64d (Base64 Decoder) ================
 Usage:
   1. Drag and drop Base64-encoded file(s) onto this executable.
   2. Or run from CLI: b64d <file1> [file2] ...
 
-Or enter a file path to decode manually: C:\Users\Name\Desktop\encoded.txt
-Success! Decoded into: "C:\\Users\\Name\\Desktop\\encoded-decoded.txt"
+Or enter a file path to decode manually: /home/user/encoded.txt
+Success! Decoded into: "/home/user/encoded-decoded.txt"
 Press Enter to continue...
-```
-
-### Method C: Command-Line Interface (CLI Mode)
-Integrate `b64d` inside your terminal scripts or automated pipelines:
-```bash
-# Decode a single file
-b64d raw_data.txt
-
-# Decode multiple files in one run
-b64d cert.pem logo.b64 payload.txt
 ```
 
 ---
 
-## License
+## Quick Build & Run
 
-This project is licensed under the terms of the MIT License (see `LICENSE` for details).
+If you want to compile `b64d` from source:
+
+```bash
+# Run tests
+cargo test
+
+# Build optimized binary
+cargo build --release
+```
+The compiled binary will be placed at `target/release/b64d` (or `b64d.exe` on Windows).
