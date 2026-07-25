@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers whenever you push a tag like v1.0.0
+
+jobs:
+  build:
+    name: Build - ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact_name: b64d.exe
+            release_name: b64d-windows-amd64.exe
+
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact_name: b64d
+            release_name: b64d-linux-amd64
+
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact_name: b64d
+            release_name: b64d-macos-amd64
+
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact_name: b64d
+            release_name: b64d-macos-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare binary for upload
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mv ${{ matrix.artifact_name }} ../../../${{ matrix.release_name }}
+          else
+            mv ${{ matrix.artifact_name }} ../../../${{ matrix.release_name }}
+          fi
+
+      - name: Upload binaries to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.release_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
