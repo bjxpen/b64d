@@ -6,6 +6,7 @@ impl Platform {
     pub fn is_running_in_console() -> bool {
         #[cfg(target_os = "windows")]
         {
+            #[link(name = "kernel32")]
             extern "system" {
                 fn GetConsoleProcessList(lpdwProcessList: *mut u32, dwProcessCount: u32) -> u32;
             }
@@ -31,6 +32,7 @@ impl Platform {
     pub fn show_gui_error(title: &str, message: &str) {
         #[cfg(target_os = "windows")]
         {
+            #[link(name = "user32")]
             extern "system" {
                 fn MessageBoxW(
                     hWnd: *mut std::ffi::c_void,

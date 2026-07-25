@@ -1,4 +1,3 @@
-
 # b64d (Base64 Decoder)
 
 A tiny, fast, zero-dependency command-line and drag-and-drop Base64 decoder written in Rust.
@@ -15,6 +14,32 @@ Drop a base64-encoded file onto the executable, and it immediately decodes it ri
   - Double-click or drag-and-drop a file? It runs quietly and only pops up a native dialogue if something goes wrong so you can actually read the error.
 - **Tolerates messy inputs**: Easily handles wrapped lines, PEM headers (`-----BEGIN CERTIFICATE-----`), and browser Data URLs (`data:image/png;base64,...`).
 - **Supports standard and URL-safe Base64**: Decodes both safely.
+
+---
+
+## Multi-Codec Text Detection
+
+Not all text files are saved in standard ASCII/UTF-8. In Windows, if you copy-paste a base64 string into Notepad and hit save, it may default to **UTF-16LE (Unicode)**, **UTF-16BE**, or **UTF-8 with BOM**. 
+
+In standard base64 decoders, trying to decode a UTF-16 text file of base64 characters fails immediately because of hidden null bytes (`0x00`) and BOM markers. 
+
+`b64d` fixes this. It includes a built-in text codec sensor that automatically detects:
+1. **UTF-8 with BOM**
+2. **UTF-16LE (with or without BOM)**
+3. **UTF-16BE (with or without BOM)**
+4. **Standard 8-bit ASCII & ANSI Code Pages** (such as Windows-1252, GBK/Chinese, Shift-JIS/Japanese, and EUC-KR/Korean)
+
+If it detects the file is encoded in a text codec (even without an extension), it automatically translates the file's codec to a readable Base64 payload first, decodes it, and writes the output file. No manual format conversions are required!
+
+---
+
+## Heavy Multiline & Line Wrap Support (CRLF & LF)
+
+`b64d` is extremely resilient with multiline base64 text files. 
+
+If your file has Base64 segments split across several lines, has line breaks (`\n` or `\r\n`), or uses different wrapping widths (such as standard 64 or 76 character wraps), `b64d` handles it with ease:
+* It reads the entire text file and automatically filters out any whitespaces, space padding, line feeds, and carriage returns.
+* It merges the multi-line segments back into a single unbroken Base64 string for lossless binary translation.
 
 ---
 
@@ -48,32 +73,3 @@ b64d encoded.txt
 
 # Multiple files at once
 b64d file1.b64 image.png.txt data.pem
-```
-
-### 2. Interactive CLI Prompt
-If you run `b64d` inside a terminal without passing any arguments, it starts an interactive CLI menu:
-```text
-================ b64d (Base64 Decoder) ================
-Usage:
-  1. Drag and drop Base64-encoded file(s) onto this executable.
-  2. Or run from CLI: b64d <file1> [file2] ...
-
-Or enter a file path to decode manually: /home/user/encoded.txt
-Success! Decoded into: "/home/user/encoded-decoded.txt"
-Press Enter to continue...
-```
-
----
-
-## Quick Build & Run
-
-If you want to compile `b64d` from source:
-
-```bash
-# Run tests
-cargo test
-
-# Build optimized binary
-cargo build --release
-```
-The compiled binary will be placed at `target/release/b64d` (or `b64d.exe` on Windows).

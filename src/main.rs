@@ -1,5 +1,6 @@
 mod decoder;
 mod extractor;
+mod text_codec;
 mod path_resolver;
 mod platform;
 mod app;
