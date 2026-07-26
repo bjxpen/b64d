@@ -1,24 +1,32 @@
+/// Supported text file encodings.
+pub enum Codec {
+    Utf8,
+    Utf16Le,
+    Utf16Be,
+}
+
 /// Helper to detect and decode text bytes from multiple encodings (UTF-8, UTF-16, ANSI) into standard Strings.
 pub struct TextCodec;
 
 impl TextCodec {
-    /// Detects the text encoding of raw bytes and decodes them into a standard UTF-8 String.
-    pub fn to_utf8_string(bytes: &[u8]) -> String {
+    /// Detects the text encoding of raw bytes without doing full-file scans.
+    pub fn detect_codec(bytes: &[u8]) -> Codec {
         if bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF {
             // UTF-8 with BOM
-            String::from_utf8_lossy(&bytes[3..]).into_owned()
+            Codec::Utf8
         } else if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE {
             // UTF-16LE with BOM
-            Self::decode_utf16_le(&bytes[2..])
+            Codec::Utf16Le
         } else if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
             // UTF-16BE with BOM
-            Self::decode_utf16_be(&bytes[2..])
+            Codec::Utf16Be
         } else {
-            // No BOM. Detect UTF-16LE/BE heuristically by analyzing null-byte patterns.
-            if bytes.len() >= 4 {
+            // No BOM. Detect UTF-16LE/BE heuristically by analyzing null-byte patterns of the first 4096 bytes.
+            let scan_len = std::cmp::min(bytes.len(), 4096);
+            if scan_len >= 4 {
                 let mut nulls_odd = 0;
                 let mut nulls_even = 0;
-                let limit = bytes.len() - (bytes.len() % 2);
+                let limit = scan_len - (scan_len % 2);
                 for i in (0..limit).step_by(2) {
                     if bytes[i] == 0 {
                         nulls_even += 1;
@@ -30,16 +38,41 @@ impl TextCodec {
                 let pairs = limit / 2;
                 if nulls_odd > pairs * 7 / 10 && nulls_even < pairs * 1 / 10 {
                     // Very high likelihood of UTF-16LE (even ASCII bytes, odd Null bytes)
-                    return Self::decode_utf16_le(bytes);
+                    return Codec::Utf16Le;
                 } else if nulls_even > pairs * 7 / 10 && nulls_odd < pairs * 1 / 10 {
                     // Very high likelihood of UTF-16BE (even Null bytes, odd ASCII bytes)
-                    return Self::decode_utf16_be(bytes);
+                    return Codec::Utf16Be;
                 }
             }
-            // Default fallback: handles standard UTF-8 (no BOM) and 8-bit ANSI codepages (like GBK/Shift-JIS)
-            // seamlessly for Base64 alphanumeric characters.
-            String::from_utf8_lossy(bytes).into_owned()
+            Codec::Utf8
         }
+    }
+
+    /// Decodes raw bytes using the specified text codec.
+    pub fn decode_with_codec(bytes: &[u8], codec: &Codec) -> String {
+        match codec {
+            Codec::Utf8 => {
+                if bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF {
+                    String::from_utf8_lossy(&bytes[3..]).into_owned()
+                } else {
+                    String::from_utf8_lossy(bytes).into_owned()
+                }
+            }
+            Codec::Utf16Le => {
+                let start = if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE { 2 } else { 0 };
+                Self::decode_utf16_le(&bytes[start..])
+            }
+            Codec::Utf16Be => {
+                let start = if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF { 2 } else { 0 };
+                Self::decode_utf16_be(&bytes[start..])
+            }
+        }
+    }
+
+    /// Detects the text encoding of raw bytes and decodes them into a standard UTF-8 String (legacy helper).
+    pub fn to_utf8_string(bytes: &[u8]) -> String {
+        let codec = Self::detect_codec(bytes);
+        Self::decode_with_codec(bytes, &codec)
     }
 
     fn decode_utf16_le(bytes: &[u8]) -> String {

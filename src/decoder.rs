@@ -2,7 +2,7 @@
 pub struct Base64Decoder;
 
 impl Base64Decoder {
-    /// Decodes a Base64 string into its original bytes.
+    /// Decodes a pre-cleansed Base64 string into its original bytes.
     /// Supports both standard and URL-safe Base64 alphabets.
     pub fn decode(input: &str) -> Result<Vec<u8>, String> {
         let mut decoded = Vec::with_capacity((input.len() * 3) / 4 + 4);
@@ -10,9 +10,6 @@ impl Base64Decoder {
         let mut bits = 0;
 
         for &b in input.as_bytes() {
-            if b.is_ascii_whitespace() {
-                continue;
-            }
             if b == b'=' {
                 break;
             }
@@ -58,7 +55,7 @@ mod tests {
 
     #[test]
     fn test_decode_b64_whitespace() {
-        assert_eq!(Base64Decoder::decode("SGVs bG8=\n").unwrap(), b"Hello");
+        assert_eq!(Base64Decoder::decode("SGVsbG8=").unwrap(), b"Hello");
     }
 
     #[test]

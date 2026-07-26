@@ -13,10 +13,16 @@ impl PathResolver {
 
         let mut idx = 0;
         loop {
-            let filename = if idx == 0 {
-                if ext.is_empty() { format!("{}-decoded", stem) } else { format!("{}-decoded.{}", stem, ext) }
+            let suffix = if idx == 0 {
+                "-decoded".to_string()
             } else {
-                if ext.is_empty() { format!("{}-decoded({})", stem, idx) } else { format!("{}-decoded({}).{}", stem, idx, ext) }
+                format!("-decoded({})", idx)
+            };
+
+            let filename = if ext.is_empty() {
+                format!("{}{}", stem, suffix)
+            } else {
+                format!("{}{}.{}", stem, suffix, ext)
             };
 
             let candidate = parent.join(&filename);

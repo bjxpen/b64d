@@ -45,19 +45,16 @@ impl App {
         let mut input_path = String::new();
         if io::stdin().read_line(&mut input_path).is_ok() {
             let trimmed = input_path.trim().trim_matches('"').trim_matches('\'');
-            if trimmed.is_empty() {
+            if !trimmed.is_empty() {
+                let path = Path::new(trimmed);
+                if path.exists() {
+                    self.process_file(path);
+                } else {
+                    self.report_error("File Not Found", &format!("File '{}' does not exist.", trimmed));
+                }
+            } else {
                 println!("No file specified. Exiting.");
-                return;
             }
-
-            let path = Path::new(trimmed);
-            if !path.exists() {
-                self.report_error("File Not Found", &format!("File '{}' does not exist.", trimmed));
-                self.wait_for_enter();
-                return;
-            }
-
-            self.process_file(path);
         }
         self.wait_for_enter();
     }
@@ -100,11 +97,7 @@ impl App {
             return Err("File is empty.".to_string());
         }
 
-        let b64_str = Base64Extractor::extract(&raw_bytes);
-        if b64_str.is_empty() {
-            return Err("No valid Base64 characters found in file.".to_string());
-        }
-
+        let b64_str = Base64Extractor::extract(&raw_bytes)?;
         let decoded_bytes = Base64Decoder::decode(&b64_str)?;
         let target_path = PathResolver::generate_unique_path(path);
 
