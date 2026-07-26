@@ -3,15 +3,11 @@ pub struct Platform;
 
 impl Platform {
     /// Detects if the current process is running in an interactive CLI/console.
+    /// On Windows, it attempts to attach to the parent console process.
     pub fn is_running_in_console() -> bool {
         #[cfg(target_os = "windows")]
         {
-            #[link(name = "kernel32")]
-            extern "system" {
-                fn GetConsoleProcessList(lpdwProcessList: *mut u32, dwProcessCount: u32) -> u32;
-            }
-            let mut list = [0u32; 2];
-            unsafe { GetConsoleProcessList(list.as_mut_ptr(), 2) > 1 }
+            Self::try_attach_console()
         }
 
         #[cfg(unix)]
@@ -25,6 +21,34 @@ impl Platform {
         #[cfg(not(any(target_os = "windows", unix)))]
         {
             true
+        }
+    }
+
+    /// Attempts to attach to the parent console process on Windows.
+    /// If successful, redirects standard handles so standard print macros print to the parent console.
+    #[cfg(target_os = "windows")]
+    fn try_attach_console() -> bool {
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn AttachConsole(dwProcessId: u32) -> i32;
+            fn GetStdHandle(nStdHandle: u32) -> *mut std::ffi::c_void;
+            fn SetStdHandle(nStdHandle: u32, hHandle: *mut std::ffi::c_void) -> i32;
+        }
+
+        // ATTACH_PARENT_PROCESS is -1 (0xFFFFFFFF)
+        if unsafe { AttachConsole(0xFFFFFFFF) != 0 } {
+            unsafe {
+                let h_out = GetStdHandle(0xFFFFFFF5); // STD_OUTPUT_HANDLE
+                let h_err = GetStdHandle(0xFFFFFFF4); // STD_ERROR_HANDLE
+                let h_in = GetStdHandle(0xFFFFFFF6);  // STD_INPUT_HANDLE
+
+                SetStdHandle(0xFFFFFFF5, h_out);
+                SetStdHandle(0xFFFFFFF4, h_err);
+                SetStdHandle(0xFFFFFFF6, h_in);
+            }
+            true
+        } else {
+            false
         }
     }
 

@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), windows_subsystem = "windows")]
+
 mod decoder;
 mod extractor;
 mod text_codec;
